@@ -2,6 +2,7 @@
 
 require 'better_together'
 require 'sentry-ruby'
+require 'better_together/sentry/csp_sources'
 require 'better_together/sentry/version'
 require 'better_together/sentry/head_tags'
 require 'better_together/sentry/reporter'
@@ -19,7 +20,7 @@ module BetterTogether
         HeadTags.render(view_context)
       end
       BetterTogether.register_content_security_policy_sources(:script_src, 'https://js-de.sentry-cdn.com')
-      BetterTogether.register_content_security_policy_sources(:connect_src, 'https://o0.ingest.sentry.io')
+      BetterTogether.register_content_security_policy_sources(:connect_src, CspSources.connect_sources)
     end
   end
 end
