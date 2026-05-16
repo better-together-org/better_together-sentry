@@ -2,6 +2,7 @@
 
 require 'better_together'
 require 'sentry-ruby'
+require 'better_together/sentry/configuration'
 require 'better_together/sentry/csp_sources'
 require 'better_together/sentry/version'
 require 'better_together/sentry/head_tags'

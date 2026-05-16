@@ -3,6 +3,10 @@
 module BetterTogether
   module Sentry
     class Railtie < ::Rails::Railtie
+      initializer 'better_together.sentry.bootstrap' do
+        BetterTogether::Sentry::Configuration.bootstrap!
+      end
+
       initializer 'better_together.sentry.register_adapter' do
         next unless defined?(BetterTogether)
         next unless defined?(::Sentry)
