@@ -26,7 +26,7 @@ class BetterTogetherSentrySettingsTest < Minitest::Test
     assert_nil resolved.client_key
     assert_nil resolved.environment
     refute resolved.configured?
-    assert_in_delta 1.0, resolved.traces_sample_rate
+    assert_in_delta 0.05, resolved.traces_sample_rate
   end
 
   def test_dsn_format
@@ -40,7 +40,7 @@ class BetterTogetherSentrySettingsTest < Minitest::Test
   def test_traces_sample_rate_is_a_number_between_zero_and_one
     assert_in_delta 0.25, Settings.resolve(FakePlatform.new('sentry.traces_sample_rate' => '0.25')).traces_sample_rate
     assert_in_delta 0.0, Settings.resolve(FakePlatform.new('sentry.traces_sample_rate' => '0')).traces_sample_rate
-    assert_in_delta 1.0, Settings.resolve(FakePlatform.new('sentry.traces_sample_rate' => '1.5')).traces_sample_rate
+    assert_in_delta 0.05, Settings.resolve(FakePlatform.new('sentry.traces_sample_rate' => '1.5')).traces_sample_rate
   end
 
   def test_environment_fallback_is_for_the_host_platform_only

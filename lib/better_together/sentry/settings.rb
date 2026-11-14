@@ -13,7 +13,7 @@ module BetterTogether
       CLIENT_KEY_FORMAT = /\A[0-9a-f]{16,64}\z/i
       ENVIRONMENT_FORMAT = /\A[A-Za-z0-9_.-]{1,64}\z/
       RATE_FORMAT = /\A(?:0(?:\.\d+)?|1(?:\.0+)?)\z/
-      DEFAULT_TRACES_RATE = 1.0
+      DEFAULT_TRACES_RATE = 0.05
       GROUP = 'Sentry error reporting'
 
       ENV_KEYS = {

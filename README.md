@@ -36,9 +36,26 @@ Requires a Community Engine with `BetterTogether.register_platform_setting` (the
 | Server DSN | `https://<key>@<host>/<project>`. Blank turns server error reporting off for the platform. Masked in the form and never logged in full. |
 | Browser client key | The key in the Sentry loader script URL. Blank turns the browser script off. |
 | Environment | For example `production` or `staging`. |
-| Traces sample rate | 0 to 1, server traces (default 1.0, as before). |
+| Traces sample rate | 0 to 1, server traces (default 0.05, like the host apps). |
 | Record session replays | Opt-in, needs analytics consent. |
 | Attach person id to server errors | Opt-in, needs analytics consent. |
+
+Environment defaults (host platform bootstrap):
+
+- `SENTRY_DSN` enables initialization
+- `GIT_REV` sets the Sentry release (left unset when blank so Sentry can auto-detect it)
+- `breadcrumbs_logger` defaults to `[:active_support_logger, :http_logger]`
+- `SENTRY_TRACES_SAMPLE_RATE` defaults to `0.05` (values outside 0..1 fall back to the default)
+- `SENTRY_PROFILES_SAMPLE_RATE` defaults to `0` (profiling also needs stackprof or vernier)
+- `SENTRY_TRACES_SAMPLER`: unset/`default` uses a parent-aware sampler that honours an upstream
+  sampling decision and never traces `/healthcheck`, `/up`, `/assets`, `/cable`,
+  `/rails/active_storage` or `/packs`; `always` traces every request (legacy); `disabled` uses
+  only `SENTRY_TRACES_SAMPLE_RATE`
+- `SystemExit` is excluded from error reports
+
+These defaults match the values the NL Venues, Better Together and Newfoundland Labrador Online
+host apps already set. The bootstrap runs after `config/initializers`, so a host app's own
+`Sentry.init` wins.
 
 `SENTRY_DSN`, `SENTRY_CLIENT_KEY`, `SENTRY_ENVIRONMENT` and `SENTRY_TRACES_SAMPLE_RATE` still work, as a fallback for the host platform only (other platforms never inherit them). `GIT_REV` sets the release. `send_default_pii` is always false.
 

@@ -3,7 +3,7 @@
 module BetterTogether
   module Sentry
     class Railtie < ::Rails::Railtie
-      initializer 'better_together.sentry.bootstrap' do
+      initializer 'better_together.sentry.bootstrap', after: :load_config_initializers do
         BetterTogether::Sentry::Configuration.bootstrap!
       end
 
