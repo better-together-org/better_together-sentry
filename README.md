@@ -1,31 +1,59 @@
 # Better Together Sentry
 
-Thin provider gem that registers Sentry adapters into the Better Together adapter registry.
+Adds [Sentry](https://sentry.io) error reporting to a [Community Engine](https://github.com/better-together-org/community-engine-rails) host app, configured per platform and respecting visitor consent.
 
-## Purpose
+## What it is for
 
-This gem keeps Sentry out of the Community Engine gem while allowing host apps to opt in to:
+- **Server error reporting.** Starts Sentry for the host app, and lets each platform report to its own Sentry project (or to none). An exception on one platform never lands in another platform's project.
+- **Browser error reporting.** Adds the Sentry browser script for platforms that have a client key.
+- **Privacy by default.** No email addresses, usernames or IP addresses are sent. Session replay and attaching the signed-in person id are opt-in per platform and only run after the visitor consents to analytics.
+- **Sensible performance defaults.** 5 percent trace sampling, no profiling, and no traces for health checks, assets or storage requests.
+- **Cookie policy.** Registers its entries with the platform's cookie policy page.
 
-- error reporting
-- browser Sentry head tags
-- Sentry runtime bootstrap for apps that provide `SENTRY_DSN`
-- future metrics/observability fan-out
+## Where you configure it
 
-## Usage
+Platform stewards open **Edit platform, Integrations**. The Sentry group appears there once the gem is installed (the Google Analytics group in the screenshot comes from [better_together-google-analytics](https://github.com/better-together-org/better_together-google-analytics)).
 
-Add the gem to a CE host app and require it during boot.
+![Platform edit form, Integrations tab, with the Sentry fields](docs/images/platform-integrations-tab.png)
 
-```ruby
-gem 'better_together-sentry', path: '../better_together-sentry'
-```
+On a phone the same tab stacks into one column:
 
-The gem registers:
+![Integrations tab on mobile](docs/images/platform-integrations-tab-mobile.png)
 
-- a default `Sentry.init` bootstrap when `SENTRY_DSN` is present and Sentry has not already been initialized
-- an `:error_reporting` adapter named `:sentry` when `Sentry` is loaded
-- a head-tag provider for the browser Sentry CDN script when the platform has a client key
-- the related CSP origins for the host platform
-- platform settings, a consent provider and cookie policy segments (below)
+The screenshots use example values only. The DSN is a secret field: it is masked after saving and never logged in full.
+
+## Requirements
+
+- Community Engine `>= 0.11.0` with the platform Integrations tab (`BetterTogether.register_platform_setting`). Consent features need the consent system as well.
+- Ruby `>= 3.2`. The gem depends on `sentry-rails`.
+
+## Installing in a host app
+
+1. Add the gem to the host app's `Gemfile`:
+
+   ```ruby
+   gem 'better_together-sentry', github: 'better-together-org/better_together-sentry', branch: 'main'
+   ```
+
+   Pin a `tag:` or `ref:` for production. While developing locally you can use `path: '../better_together-sentry'`.
+
+2. Install:
+
+   ```bash
+   bundle install
+   ```
+
+   There are no migrations and no generators. The gem registers itself when Rails boots.
+
+3. Create a Sentry project and copy its DSN (Settings, Client Keys). For browser reporting also copy the key from the loader script URL (`https://js-de.sentry-cdn.com/<key>.min.js`).
+
+4. Sign in as a platform steward, open **Edit platform, Integrations**, fill in the Server DSN and, if wanted, the Browser client key, Environment and Traces sample rate, then save. Repeat per platform.
+
+5. Check it: trigger a test error on a non-production environment and confirm it arrives in the right Sentry project.
+
+### Host platform from the environment
+
+For the host platform only, these variables work as a fallback when the form is blank, so existing apps keep working: `SENTRY_DSN`, `SENTRY_CLIENT_KEY`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE`. `GIT_REV` sets the release. Other platforms never inherit these. If the app already calls `Sentry.init` in an initializer, that call wins.
 
 ## Per-platform settings
 
