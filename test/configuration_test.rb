@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require 'minitest/autorun'
-require 'ostruct'
 require 'better_together/sentry/configuration'
 
 class BetterTogetherSentryConfigurationTest < Minitest::Test
@@ -12,6 +11,7 @@ class BetterTogetherSentryConfigurationTest < Minitest::Test
     :traces_sample_rate,
     :traces_sampler,
     :profiles_sample_rate,
+    :excluded_exceptions,
     keyword_init: true
   )
 
@@ -30,7 +30,7 @@ class BetterTogetherSentryConfigurationTest < Minitest::Test
         end
 
         def init
-          @config = BetterTogetherSentryConfigurationTest::FakeConfig.new
+          @config = BetterTogetherSentryConfigurationTest::FakeConfig.new(excluded_exceptions: [])
           yield @config
           @initialized = true
         end
@@ -63,9 +63,9 @@ class BetterTogetherSentryConfigurationTest < Minitest::Test
       assert_equal env['SENTRY_DSN'], fake_sentry.config.dsn
       assert_equal 'abc123', fake_sentry.config.release
       assert_equal %i[active_support_logger http_logger], fake_sentry.config.breadcrumbs_logger
-      assert_equal 1.0, fake_sentry.config.traces_sample_rate
-      assert_equal 1.0, fake_sentry.config.profiles_sample_rate
-      assert fake_sentry.config.traces_sampler.call(OpenStruct.new)
+      assert_equal 0.05, fake_sentry.config.traces_sample_rate
+      assert_equal 0.0, fake_sentry.config.profiles_sample_rate
+      assert_includes fake_sentry.config.excluded_exceptions, 'SystemExit'
     end
   end
 
@@ -80,7 +80,7 @@ class BetterTogetherSentryConfigurationTest < Minitest::Test
   end
 
   def test_apply_defaults_uses_env_overrides
-    config = FakeConfig.new
+    config = FakeConfig.new(excluded_exceptions: [])
     env = {
       'SENTRY_DSN' => 'https://public@example.ingest.sentry.io/123',
       'GIT_REV' => 'rev-1',
@@ -96,5 +96,48 @@ class BetterTogetherSentryConfigurationTest < Minitest::Test
     assert_equal 0.25, config.traces_sample_rate
     assert_equal 0.5, config.profiles_sample_rate
     assert_nil config.traces_sampler
+  end
+
+  def new_config
+    FakeConfig.new(excluded_exceptions: [])
+  end
+
+  def apply(env)
+    config = new_config
+    BetterTogether::Sentry::Configuration.apply_defaults(config, { 'SENTRY_DSN' => 'https://k@example.io/1' }.merge(env))
+    config
+  end
+
+  def test_blank_git_rev_leaves_release_unset
+    assert_nil apply('GIT_REV' => '  ').release
+  end
+
+  def test_out_of_range_or_invalid_rates_fall_back_to_defaults
+    assert_equal 0.05, apply('SENTRY_TRACES_SAMPLE_RATE' => '5').traces_sample_rate
+    assert_equal 0.05, apply('SENTRY_TRACES_SAMPLE_RATE' => '-1').traces_sample_rate
+    assert_equal 0.0, apply('SENTRY_PROFILES_SAMPLE_RATE' => 'abc').profiles_sample_rate
+  end
+
+  def test_default_sampler_skips_noisy_paths_and_uses_rate
+    sampler = apply('SENTRY_TRACES_SAMPLE_RATE' => '0.2').traces_sampler
+
+    assert_in_delta 0.2, sampler.call(rack_env: { 'PATH_INFO' => '/en/events' }), 0.0001
+    assert_equal 0.0, sampler.call(rack_env: { 'PATH_INFO' => '/healthcheck' })
+    assert_equal 0.0, sampler.call(rack_env: { 'PATH_INFO' => '/assets/app.js' })
+    assert_equal 0.0, sampler.call(rack_env: { 'PATH_INFO' => '/rails/active_storage/blobs/x' })
+    assert_in_delta 0.2, sampler.call(rack_env: { 'PATH_INFO' => '/upload' }), 0.0001
+    assert_in_delta 0.2, sampler.call({}), 0.0001
+  end
+
+  def test_default_sampler_honours_parent_decision
+    sampler = apply({}).traces_sampler
+
+    assert_equal true, sampler.call(parent_sampled: true, rack_env: { 'PATH_INFO' => '/healthcheck' })
+    assert_equal false, sampler.call(parent_sampled: false, rack_env: { 'PATH_INFO' => '/en' })
+  end
+
+  def test_sampler_modes
+    assert_equal true, apply('SENTRY_TRACES_SAMPLER' => 'always').traces_sampler.call({})
+    assert_nil apply('SENTRY_TRACES_SAMPLER' => 'disabled').traces_sampler
   end
 end

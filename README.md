@@ -31,11 +31,19 @@ The gem registers:
 Default bootstrap behavior:
 
 - `SENTRY_DSN` enables initialization
-- `GIT_REV` sets the Sentry release
+- `GIT_REV` sets the Sentry release (left unset when blank so Sentry can auto-detect it)
 - `breadcrumbs_logger` defaults to `[:active_support_logger, :http_logger]`
-- `SENTRY_TRACES_SAMPLE_RATE` overrides the default `1.0`
-- `SENTRY_PROFILES_SAMPLE_RATE` overrides the default `1.0`
-- `SENTRY_TRACES_SAMPLER=always` keeps the legacy always-sample behavior
+- `SENTRY_TRACES_SAMPLE_RATE` defaults to `0.05` (values outside 0..1 fall back to the default)
+- `SENTRY_PROFILES_SAMPLE_RATE` defaults to `0` (profiling also needs stackprof or vernier)
+- `SENTRY_TRACES_SAMPLER`: unset/`default` uses a parent-aware sampler that honours an upstream
+  sampling decision and never traces `/healthcheck`, `/up`, `/assets`, `/cable`,
+  `/rails/active_storage` or `/packs`; `always` traces every request (legacy); `disabled` uses
+  only `SENTRY_TRACES_SAMPLE_RATE`
+- `SystemExit` is excluded from error reports
+
+These defaults match the values the NL Venues, Better Together and Newfoundland Labrador Online
+host apps already set. The bootstrap runs after `config/initializers`, so a host app's own
+`Sentry.init` wins.
 
 The adapter sends exception context into Sentry `extra:`.
 

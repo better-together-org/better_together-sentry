@@ -18,26 +18,55 @@ module BetterTogether
         end
       end
 
+      DEFAULT_TRACES_SAMPLE_RATE = 0.05
+      DEFAULT_PROFILES_SAMPLE_RATE = 0.0
+      # Health checks, assets and websocket/storage plumbing never produce useful traces.
+      UNSAMPLED_PATHS = %r{\A/(healthcheck|up|assets|cable|rails/active_storage|packs)(/|\z)}
+
       def apply_defaults(config, env = ENV)
         config.dsn = env.fetch('SENTRY_DSN', '').to_s
-        config.release = env.fetch('GIT_REV', '').to_s
+        release = env.fetch('GIT_REV', '').to_s.strip
+        config.release = release unless release.empty?
         config.breadcrumbs_logger = %i[active_support_logger http_logger]
-        config.traces_sample_rate = sample_rate(env, 'SENTRY_TRACES_SAMPLE_RATE', 1.0)
-        config.traces_sampler = always_sample if env.fetch('SENTRY_TRACES_SAMPLER', 'always') == 'always'
-        config.profiles_sample_rate = sample_rate(env, 'SENTRY_PROFILES_SAMPLE_RATE', 1.0)
+        apply_tracing(config, env)
+        config.profiles_sample_rate = sample_rate(env, 'SENTRY_PROFILES_SAMPLE_RATE', DEFAULT_PROFILES_SAMPLE_RATE)
+        config.excluded_exceptions += ['SystemExit'] if config.respond_to?(:excluded_exceptions)
+      end
+
+      # SENTRY_TRACES_SAMPLER: unset or "default" = parent-aware sampler that skips noisy paths,
+      # "always" = trace every request (legacy opt-in), "disabled" = plain traces_sample_rate only.
+      def apply_tracing(config, env)
+        rate = sample_rate(env, 'SENTRY_TRACES_SAMPLE_RATE', DEFAULT_TRACES_SAMPLE_RATE)
+        config.traces_sample_rate = rate
+        case env.fetch('SENTRY_TRACES_SAMPLER', 'default').to_s.strip
+        when 'always' then config.traces_sampler = always_sample
+        when 'disabled' then nil
+        else config.traces_sampler = path_aware_sampler(rate)
+        end
       end
 
       def sample_rate(env, key, default)
         value = env[key]
         return default if value.nil? || value.to_s.strip.empty?
 
-        Float(value)
+        rate = Float(value)
+        rate.between?(0.0, 1.0) ? rate : default
       rescue ArgumentError, TypeError
         default
       end
 
+      def path_aware_sampler(rate)
+        lambda do |context|
+          parent = context[:parent_sampled]
+          next parent unless parent.nil?
+
+          path = (context[:rack_env] || {}).fetch('PATH_INFO', '').to_s
+          path.match?(UNSAMPLED_PATHS) ? 0.0 : rate
+        end
+      end
+
       def always_sample
-        lambda { |_context| true }
+        ->(_context) { true }
       end
     end
   end
