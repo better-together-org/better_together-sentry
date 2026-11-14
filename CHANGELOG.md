@@ -12,6 +12,8 @@ All notable changes to this gem are recorded here. Format: Keep a Changelog, ver
 - `CspSources.origins_for(platform)` computes the exact CSP origins for one platform.
 - LICENSE, CI workflow, Rakefile, Rubocop config, test and rspec skeletons.
 
+- Private and protected pages stay essential-only. Session replay runs only while the page's `bt-third-party-tracking` meta tag is `on` (checked on load and on every `turbo:load`, and stopped when a visit reaches a private page). The reporter never attaches a person id when the error context has `private_page` set (CE sets it from its tracking exclusion rules). Errors are still reported, with request context only.
+
 ### Changed
 - `SENTRY_DSN` is validated (https, key, project id); a malformed value no longer initialises Sentry.
 - Boot-time CSP registration is limited to what the process environment implies for the host platform (CE registers CSP sources globally, not per platform).

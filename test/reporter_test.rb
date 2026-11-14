@@ -68,6 +68,15 @@ class BetterTogetherSentryReporterTest < Minitest::Test
     assert_nil sent_events(not_flagged).first.to_h[:user]&.fetch(:id, nil)
   end
 
+  def test_private_pages_never_carry_a_person_id_even_with_consent
+    reporter = reporter_for(platform('sentry.identify_users' => true))
+    reporter.call(error, context: CONTEXT.merge(consent: { 'analytics' => true }, private_page: true))
+    event = sent_events(reporter).first.to_h
+
+    assert_nil event[:user]&.fetch(:id, nil)
+    refute event[:extra].key?(:private_page)
+  end
+
   def test_email_and_ip_are_never_sent
     reporter = reporter_for(platform('sentry.identify_users' => true))
     reporter.call(error, context: CONTEXT.merge(consent: { analytics: true }, email: 'a@b.c', ip: '10.0.0.1'))

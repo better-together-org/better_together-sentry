@@ -85,6 +85,14 @@ class BetterTogetherSentryHeadTagsTest < Minitest::Test
     assert_operator out.index('window.sentryOnLoad'), :<, out.index('function setReplay')
   end
 
+  def test_replay_only_runs_on_pages_marked_trackable
+    out = render(FakePlatform.new('sentry.client_key' => SentryFixtures::KEY_A, 'sentry.replay_enabled' => true))
+
+    assert_includes out, 'meta[name="bt-third-party-tracking"]'
+    assert_includes out, "meta.content === 'on'"
+    assert_includes out, "document.addEventListener('turbo:load'"
+  end
+
   def test_environment_is_embedded_only_when_valid
     ok = render(FakePlatform.new('sentry.client_key' => SentryFixtures::KEY_A, 'sentry.environment' => 'staging'))
     bad = render(FakePlatform.new('sentry.client_key' => SentryFixtures::KEY_A, 'sentry.environment' => '</script>'))

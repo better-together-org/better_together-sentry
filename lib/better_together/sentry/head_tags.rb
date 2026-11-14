@@ -58,8 +58,16 @@ module BetterTogether
         <<~JS.strip
           var replay = null;
           var policyVersion = #{json(policy_version)};
+          var consent = null;
+          // Private and protected pages stay essential-only: the page's bt-third-party-tracking meta
+          // must be 'on'. Checked on load and on every Turbo visit, since this script persists.
+          function pageTrackable() {
+            var meta = document.querySelector('meta[name="bt-third-party-tracking"]');
+            return !!meta && meta.content === 'on';
+          }
           function setReplay(c) {
-            var granted = !!(c && c.analytics);
+            if (c !== undefined) consent = c;
+            var granted = !!(consent && consent.analytics) && pageTrackable();
             if (granted && !replay && Sentry.lazyLoadIntegration) {
               replay = 'loading';
               Sentry.lazyLoadIntegration('replayIntegration').then(function(factory) {
@@ -79,6 +87,7 @@ module BetterTogether
             if (saved && saved.v === 1 && (!policyVersion || saved.pv === policyVersion)) setReplay(saved);
           } catch (e) {}
           window.addEventListener('better_together:consent', function(event) { setReplay(event && event.detail); });
+          document.addEventListener('turbo:load', function() { setReplay(); });
         JS
       end
 

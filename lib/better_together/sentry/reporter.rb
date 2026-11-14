@@ -39,7 +39,7 @@ module BetterTogether
 
       def identify?(settings, context)
         settings.identify? && !context[:user_id].to_s.empty? && context[:user_id].to_s != 'anonymous' &&
-          ConsentGate.analytics?(context)
+          !context[:private_page] && ConsentGate.analytics?(context)
       end
 
       # The process-wide Sentry (initialised from SENTRY_DSN) serves the platform whose DSN it is;
